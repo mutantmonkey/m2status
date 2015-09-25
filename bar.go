@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"log"
 	"time"
+	"strconv"
+	"strings"
 )
 
 type BarWidget struct {
@@ -24,9 +26,7 @@ func batteryUpdate(device string) (*BarWidget, int) {
 		log.Fatal("Unable to read battery capacity:", err)
 	}
 
-	// FIXME: see if there is a better way to do this
-	percent := 100
-	fmt.Sscanf(string(capacity), "%d", &percent)
+	percent, _ := strconv.Atoi(strings.TrimSpace(string(capacity)))
 	if percent > 100 {
 		percent = 100
 	}
