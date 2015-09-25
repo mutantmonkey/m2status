@@ -150,8 +150,10 @@ func wifiWidget(widget chan<- *BarWidget, iface string) {
 
 // TODO: make this generic
 func themeWifi(wifi *BarWidget) {
-	wifi.Color = "#dfaf8f"
-	wifi.FullText = fmt.Sprintf("\uf405  %s", wifi.FullText)
+	if len(wifi.FullText) > 0 {
+		wifi.Color = "#dfaf8f"
+		wifi.FullText = fmt.Sprintf("\uf405  %s", wifi.FullText)
+	}
 }
 
 // TODO: make this generic
