@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 	"syscall"
@@ -23,10 +23,18 @@ type BarWidget struct {
 }
 
 func batteryUpdate(device string) (*BarWidget, int) {
-	capacity, err := ioutil.ReadFile(fmt.Sprintf("/sys/class/power_supply/%s/capacity", device))
+	file, err := os.Open(fmt.Sprintf("/sys/class/power_supply/%s/capacity", device))
 	if err != nil {
-		log.Fatal("Unable to read battery capacity:", err)
+		log.Fatal(err)
 	}
+
+	capacity := make([]byte, 4)
+	_, err = file.Read(capacity)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	file.Close()
 
 	percent, _ := strconv.Atoi(strings.TrimSpace(string(capacity)))
 	if percent > 100 {
