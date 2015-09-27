@@ -22,19 +22,17 @@ type BarWidget struct {
 	Status    string `json:"_status,omitempty"`
 }
 
-func batteryUpdate(device string) (*BarWidget, int) {
-	file, err := os.Open(fmt.Sprintf("/sys/class/power_supply/%s/capacity", device))
+func batteryUpdate(device string, file *os.File) (*BarWidget, int) {
+	_, err := file.Seek(0, 0)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	capacity := make([]byte, 4)
+	capacity := make([]byte, 3)
 	_, err = file.Read(capacity)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	file.Close()
 
 	percent, _ := strconv.Atoi(strings.TrimSpace(string(capacity)))
 	if percent > 100 {
@@ -55,18 +53,25 @@ func batteryUpdate(device string) (*BarWidget, int) {
 }
 
 func batteryWidget(widget chan<- *BarWidget, device string) {
-	w, percent := batteryUpdate(device)
+	file, err := os.Open(fmt.Sprintf("/sys/class/power_supply/%s/capacity", device))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	w, percent := batteryUpdate(device, file)
 	widget <- w
 
 	c := time.Tick(15 * time.Second)
 	for range c {
 		oldpercent := percent
-		w, percent := batteryUpdate(device)
+		w, percent := batteryUpdate(device, file)
 
 		if percent != oldpercent {
 			widget <- w
 		}
 	}
+
+	file.Close()
 }
 
 func clockUpdate(now time.Time) *BarWidget {
@@ -93,7 +98,7 @@ func clockWidget(widget chan<- *BarWidget) {
 	}
 }
 
-func wifiUpdate(iface string) (*BarWidget, string) {
+func wifiUpdate(iface string, sock int) (*BarWidget, string) {
 	const (
 		// these values come from linux/wireless.h (V22)
 		IFNAMSIZ          = 16
@@ -122,13 +127,8 @@ func wifiUpdate(iface string) (*BarWidget, string) {
 		Flags:     0,
 	}
 
-	sock, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, 0)
-	if err != nil {
-		log.Fatal("Unable to get socket:", err)
-	}
-
-	_, _, serr := syscall.Syscall(syscall.SYS_IOCTL, uintptr(sock), uintptr(SIOCGIWESSID), uintptr(unsafe.Pointer(req)))
-	if serr != 0 {
+	_, _, err := syscall.Syscall(syscall.SYS_IOCTL, uintptr(sock), uintptr(SIOCGIWESSID), uintptr(unsafe.Pointer(req)))
+	if err != 0 {
 		log.Fatal("Syscall failed:", err)
 	}
 
@@ -142,17 +142,18 @@ func wifiUpdate(iface string) (*BarWidget, string) {
 }
 
 func wifiWidget(widget chan<- *BarWidget, iface string) {
-	w, essid := wifiUpdate(iface)
+	sock, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, 0)
+	if err != nil {
+		log.Fatal("Unable to get socket:", err)
+	}
+
+	w, _ := wifiUpdate(iface, sock)
 	widget <- w
 
 	c := time.Tick(15 * time.Second)
 	for range c {
-		oldessid := essid
-		w, essid := wifiUpdate(iface)
-
-		if essid != oldessid {
-			widget <- w
-		}
+		w, _ := wifiUpdate(iface, sock)
+		widget <- w
 	}
 }
 
