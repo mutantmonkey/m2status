@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"github.com/fhs/gompd/mpd"
 	"log"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"syscall"
@@ -23,13 +25,11 @@ func batteryUpdate(device string, file *os.File) (*BarWidget, int) {
 		log.Fatal(err)
 	}
 
+	status := "normal"
 	percent, _ := strconv.Atoi(strings.TrimSpace(string(capacity)))
 	if percent > 100 {
 		percent = 100
-	}
-
-	status := "normal"
-	if percent <= 15 {
+	} else if percent <= 15 {
 		status = "warn"
 	}
 
@@ -84,6 +84,64 @@ func clockWidget(widget chan<- *BarWidget) {
 	c := time.Tick(1 * time.Minute)
 	for now := range c {
 		widget <- clockUpdate(now)
+	}
+}
+
+func mpdUpdate(addr string) *BarWidget {
+	conn, err := mpd.Dial("tcp", addr)
+	if err != nil {
+		log.Fatal("Error connecting to MPD:", err)
+	}
+	defer conn.Close()
+
+	song, err := conn.CurrentSong()
+	if err != nil {
+		return &BarWidget{
+			Name:     "mpd",
+			Instance: addr,
+			FullText: "error",
+		}
+	}
+
+	artist, artist_ok := song["Artist"]
+	title, title_ok := song["Title"]
+	name, name_ok := song["Name"]
+
+	var text string
+	if artist_ok && title_ok {
+		text = fmt.Sprintf("%s - %s", artist, title)
+	} else if title_ok {
+		text = title
+	} else if name_ok {
+		text = name
+	} else {
+		text = path.Base(song["File"])
+	}
+
+	return &BarWidget{
+		Name:     "mpd",
+		Instance: addr,
+		FullText: text,
+	}
+}
+
+func mpdWidget(widget chan<- *BarWidget, addr string) {
+	widget <- mpdUpdate(addr)
+
+	w, err := mpd.NewWatcher("tcp", addr, "", "player")
+	if err != nil {
+		log.Fatal("Error creating MPD watcher:", err)
+	}
+	defer w.Close()
+
+	go func() {
+		for err := range w.Error {
+			log.Println("Error:", err)
+		}
+	}()
+
+	for range w.Event {
+		widget <- mpdUpdate(addr)
 	}
 }
 
@@ -162,6 +220,12 @@ func themeBattery(battery *BarWidget) {
 	} else {
 		battery.Color = "#7f9f7f"
 	}
+}
+
+// TODO: make this generic
+func themeMpd(mpd *BarWidget) {
+	mpd.Color = "#8cd0d3"
+	mpd.FullText = fmt.Sprintf("\uf025  %s", mpd.FullText)
 }
 
 // TODO: make this generic
