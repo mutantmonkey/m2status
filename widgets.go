@@ -102,7 +102,14 @@ func clockWidget(widget *Widget) {
 func mpdUpdate(addr string) *BarWidget {
 	conn, err := mpd.Dial("tcp", addr)
 	if err != nil {
-		log.Fatal("Error connecting to MPD:", err)
+		log.Print("MPD update error: ", err)
+
+		return &BarWidget{
+			Name:     "mpd",
+			Instance: addr,
+			FullText: "error",
+			Status:   "error",
+		}
 	}
 	defer conn.Close()
 
@@ -139,6 +146,13 @@ func mpdUpdate(addr string) *BarWidget {
 
 func mpdWidget(widget *Widget) {
 	addr := widget.Config.Args[0]
+
+	// push out an empty update to avoid start delays
+	widget.Channel <- &BarWidget{
+		Name:     "mpd",
+		Instance: addr,
+	}
+
 	widget.Channel <- mpdUpdate(addr)
 
 	w, err := mpd.NewWatcher("tcp", addr, "", "player")
@@ -149,7 +163,7 @@ func mpdWidget(widget *Widget) {
 
 	go func() {
 		for err := range w.Error {
-			log.Println("Error:", err)
+			log.Print("MPD watcher error: ", err)
 		}
 	}()
 
