@@ -41,14 +41,15 @@ func batteryUpdate(device string, file *os.File) (*BarWidget, int) {
 	}, percent
 }
 
-func batteryWidget(widget chan<- *BarWidget, device string) {
+func batteryWidget(widget *Widget) {
+	device := widget.Args[0].(string)
 	file, err := os.Open(fmt.Sprintf("/sys/class/power_supply/%s/capacity", device))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	w, percent := batteryUpdate(device, file)
-	widget <- w
+	widget.Channel <- w
 
 	c := time.Tick(15 * time.Second)
 	for range c {
@@ -56,7 +57,7 @@ func batteryWidget(widget chan<- *BarWidget, device string) {
 		w, percent := batteryUpdate(device, file)
 
 		if percent != oldpercent {
-			widget <- w
+			widget.Channel <- w
 		}
 	}
 
@@ -71,19 +72,19 @@ func clockUpdate(now time.Time) *BarWidget {
 	}
 }
 
-func clockWidget(widget chan<- *BarWidget) {
+func clockWidget(widget *Widget) {
 	now := time.Now()
-	widget <- clockUpdate(now)
+	widget.Channel <- clockUpdate(now)
 
 	// sleep until the next minute
 	duration := now.Add(1 * time.Minute).Truncate(time.Minute).Sub(now)
 	time.Sleep(duration)
 
-	widget <- clockUpdate(time.Now())
+	widget.Channel <- clockUpdate(time.Now())
 
 	c := time.Tick(1 * time.Minute)
 	for now := range c {
-		widget <- clockUpdate(now)
+		widget.Channel <- clockUpdate(now)
 	}
 }
 
@@ -125,8 +126,9 @@ func mpdUpdate(addr string) *BarWidget {
 	}
 }
 
-func mpdWidget(widget chan<- *BarWidget, addr string) {
-	widget <- mpdUpdate(addr)
+func mpdWidget(widget *Widget) {
+	addr := widget.Args[0].(string)
+	widget.Channel <- mpdUpdate(addr)
 
 	w, err := mpd.NewWatcher("tcp", addr, "", "player")
 	if err != nil {
@@ -141,7 +143,7 @@ func mpdWidget(widget chan<- *BarWidget, addr string) {
 	}()
 
 	for range w.Event {
-		widget <- mpdUpdate(addr)
+		widget.Channel <- mpdUpdate(addr)
 	}
 }
 
@@ -188,49 +190,19 @@ func wifiUpdate(iface string, sock int) (*BarWidget, string) {
 	}, essid
 }
 
-func wifiWidget(widget chan<- *BarWidget, iface string) {
+func wifiWidget(widget *Widget) {
+	iface := widget.Args[0].(string)
 	sock, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, 0)
 	if err != nil {
 		log.Fatal("Unable to get socket:", err)
 	}
 
 	w, _ := wifiUpdate(iface, sock)
-	widget <- w
+	widget.Channel <- w
 
 	c := time.Tick(15 * time.Second)
 	for range c {
 		w, _ := wifiUpdate(iface, sock)
-		widget <- w
+		widget.Channel <- w
 	}
 }
-
-// TODO: make this generic
-func themeWifi(wifi *BarWidget) {
-	if len(wifi.FullText) > 0 {
-		wifi.Color = "#dfaf8f"
-		wifi.FullText = fmt.Sprintf("\uf405  %s", wifi.FullText)
-	}
-}
-
-// TODO: make this generic
-func themeBattery(battery *BarWidget) {
-	battery.FullText = fmt.Sprintf("\uf3cf  %s", battery.FullText)
-	if battery.Status == "warn" {
-		battery.Color = "#e37170"
-	} else {
-		battery.Color = "#7f9f7f"
-	}
-}
-
-// TODO: make this generic
-func themeMpd(mpd *BarWidget) {
-	mpd.Color = "#8cd0d3"
-	mpd.FullText = fmt.Sprintf("\uf025  %s", mpd.FullText)
-}
-
-// TODO: make this generic
-func themeClock(clock *BarWidget) {
-	clock.FullText = fmt.Sprintf("\uf017  %s", clock.FullText)
-}
-
-// vim:set ts=8 sw=8 noet:
