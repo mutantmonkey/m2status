@@ -92,8 +92,6 @@ func main() {
 	}
 
 	for {
-		// TODO: handle icon and _status
-
 		b, err := json.Marshal(output)
 		if err != nil {
 			log.Fatal("Unable to marshal JSON:", err)
