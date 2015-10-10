@@ -2,25 +2,34 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"reflect"
+
+	"github.com/adrg/xdg"
+	"gopkg.in/yaml.v2"
 )
 
 type Config struct {
-	Widgets []map[string]string
-	Theme   map[string]*WidgetTheme
+	Widgets []struct {
+		Handler string
+		Args    []string
+		Color   []string
+		Icon    string
+	}
 }
 
-type WidgetTheme struct {
+type WidgetConfig struct {
+	Args  []string
 	Color []string
 	Icon  string
 }
 
 type Widget struct {
 	Handler func(*Widget)
-	Theme   *WidgetTheme
-	Args    []interface{}
+	Config  *WidgetConfig
 	Channel chan *BarWidget
 	Data    *BarWidget
 }
@@ -34,11 +43,10 @@ type BarWidget struct {
 	Status    string `json:"_status,omitempty"`
 }
 
-func NewWidget(handler func(*Widget), theme *WidgetTheme, args ...interface{}) (w *Widget) {
+func NewWidget(handler func(*Widget), config *WidgetConfig) (w *Widget) {
 	w = &Widget{
 		Handler: handler,
-		Theme:   theme,
-		Args:    args,
+		Config:  config,
 		Channel: make(chan *BarWidget),
 	}
 
@@ -47,39 +55,56 @@ func NewWidget(handler func(*Widget), theme *WidgetTheme, args ...interface{}) (
 }
 
 func (w *Widget) applyTheme() {
-	if len(w.Theme.Color) == 3 {
+	t := w.Config
+
+	if len(t.Color) == 3 {
 		if w.Data.Status == "error" {
-			w.Data.Color = w.Theme.Color[2]
+			w.Data.Color = t.Color[2]
 		} else if w.Data.Status == "warn" {
-			w.Data.Color = w.Theme.Color[1]
+			w.Data.Color = t.Color[1]
 		} else {
-			w.Data.Color = w.Theme.Color[0]
+			w.Data.Color = t.Color[0]
 		}
-	} else if len(w.Theme.Color) == 1 {
-		w.Data.Color = w.Theme.Color[0]
+	} else if len(t.Color) == 1 {
+		w.Data.Color = t.Color[0]
 	}
 
-	if w.Theme.Icon != "" && w.Data.FullText != "" {
-		w.Data.FullText = fmt.Sprintf("%s  %s", w.Theme.Icon, w.Data.FullText)
+	if t.Icon != "" && w.Data.FullText != "" {
+		w.Data.FullText = fmt.Sprintf("%s  %s", t.Icon, w.Data.FullText)
 	}
 }
 
 func main() {
-	fmt.Print(`{"version":1}[[]`)
+	config := &Config{}
+	var configPath string
 
-	widgets := []*Widget{
-		NewWidget(wifiWidget, &WidgetTheme{
-			Color: []string{"#dfaf8f"},
-			Icon:  "\uf405",
-		}, "wlp3s0"),
-		NewWidget(batteryWidget, &WidgetTheme{
-			Color: []string{"#7f9f7f", "#e37170", "#e37170"},
-			Icon:  "\uf3cf",
-		}, "BAT0"),
-		NewWidget(clockWidget, &WidgetTheme{
-			Icon: "\uf017",
-		}, nil),
+	defaultConfigPath, err := xdg.ConfigFile("m2bar/config.yml")
+	if err != nil {
+		log.Print("Unable to get XDG config file path: ", err)
+		defaultConfigPath = ""
 	}
+
+	flag.StringVar(&configPath, "config", defaultConfigPath,
+		"The path to the config file")
+	flag.Parse()
+
+	data, err := ioutil.ReadFile(configPath)
+	if err != nil {
+		log.Fatal("Unable to read config file: ", err)
+	} else {
+		yaml.Unmarshal(data, &config)
+	}
+
+	widgets := make([]*Widget, len(config.Widgets))
+	for i, w := range config.Widgets {
+		widgets[i] = NewWidget(handlers[w.Handler], &WidgetConfig{
+			Args:  w.Args,
+			Color: w.Color,
+			Icon:  w.Icon,
+		})
+	}
+
+	fmt.Print(`{"version":1}[[]`)
 
 	output := make([]*BarWidget, len(widgets))
 	cases := make([]reflect.SelectCase, len(widgets))

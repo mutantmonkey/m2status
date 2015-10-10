@@ -13,6 +13,17 @@ import (
 	"unsafe"
 )
 
+var handlers map[string]func(*Widget)
+
+func init() {
+	handlers = map[string]func(*Widget){
+		"mpd":     mpdWidget,
+		"wifi":    wifiWidget,
+		"battery": batteryWidget,
+		"clock":   clockWidget,
+	}
+}
+
 func batteryUpdate(device string, file *os.File) (*BarWidget, int) {
 	_, err := file.Seek(0, 0)
 	if err != nil {
@@ -42,7 +53,7 @@ func batteryUpdate(device string, file *os.File) (*BarWidget, int) {
 }
 
 func batteryWidget(widget *Widget) {
-	device := widget.Args[0].(string)
+	device := widget.Config.Args[0]
 	file, err := os.Open(fmt.Sprintf("/sys/class/power_supply/%s/capacity", device))
 	if err != nil {
 		log.Fatal(err)
@@ -127,7 +138,7 @@ func mpdUpdate(addr string) *BarWidget {
 }
 
 func mpdWidget(widget *Widget) {
-	addr := widget.Args[0].(string)
+	addr := widget.Config.Args[0]
 	widget.Channel <- mpdUpdate(addr)
 
 	w, err := mpd.NewWatcher("tcp", addr, "", "player")
@@ -191,7 +202,7 @@ func wifiUpdate(iface string, sock int) (*BarWidget, string) {
 }
 
 func wifiWidget(widget *Widget) {
-	iface := widget.Args[0].(string)
+	iface := widget.Config.Args[0]
 	sock, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_DGRAM, 0)
 	if err != nil {
 		log.Fatal("Unable to get socket:", err)
