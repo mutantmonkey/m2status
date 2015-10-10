@@ -124,8 +124,8 @@ func main() {
 
 		fmt.Print("," + string(b))
 
-		chosen, _, _ := reflect.Select(cases)
-		widgets[chosen].Data = <-widgets[chosen].Channel
+		chosen, value, _ := reflect.Select(cases)
+		widgets[chosen].Data = value.Interface().(*BarWidget)
 		widgets[chosen].applyTheme()
 		output[chosen] = widgets[chosen].Data
 	}
