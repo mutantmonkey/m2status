@@ -157,7 +157,8 @@ func mpdWidget(widget *Widget) {
 
 	w, err := mpd.NewWatcher("tcp", addr, "", "player")
 	if err != nil {
-		log.Fatal("Error creating MPD watcher:", err)
+		log.Print("Error creating MPD watcher:", err)
+		return
 	}
 	defer w.Close()
 
