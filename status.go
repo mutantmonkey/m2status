@@ -78,7 +78,7 @@ func main() {
 	config := &Config{}
 	var configPath string
 
-	defaultConfigPath, err := xdg.ConfigFile("m2bar/config.yml")
+	defaultConfigPath, err := xdg.ConfigFile("m2status/config.yml")
 	if err != nil {
 		log.Print("Unable to get XDG config file path: ", err)
 		defaultConfigPath = ""
