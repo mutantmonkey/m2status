@@ -1,0 +1,13 @@
+widgets:
+- handler: wifi
+  args: ["wlp3s0"]
+  color: ["#dfaf8f"]
+  icon: "\uf405"
+
+- handler: battery
+  args: ["BAT0"]
+  color: ["#7f9f7f", "#e37170", "#e37170"]
+  icon: "\uf3cf"
+
+- handler: clock
+  icon: "\uf017"
