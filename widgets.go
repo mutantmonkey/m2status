@@ -78,7 +78,7 @@ func batteryWidget(widget *Widget) {
 func clockUpdate(now time.Time) *BarWidget {
 	return &BarWidget{
 		Name:      "clock",
-		FullText:  now.Format("Mon Jan 2 15:04"),
+		FullText:  now.Format("Mon 2 Jan 15:04"),
 		ShortText: now.Format("15:04"),
 	}
 }
